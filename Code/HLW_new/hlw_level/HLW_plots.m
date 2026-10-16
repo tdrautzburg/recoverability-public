@@ -325,6 +325,15 @@ Error_ACF.prior_ThreeD = cat(3, oo_.prior_function_results{:, 3});
 % log-half-life scatters / correlations use the finite draws only.
 Error_ACF.half_life       = first_crossing_below(Error_ACF.ThreeD, 0.5);                     % nstates x ndraws
 Error_ACF.prior_half_life = first_crossing_below(Error_ACF.prior_ThreeD, 0.5);               % nstates x N_prior
+% UNDEFINED half-life (ADDED 2026-10-16): a draw that solved (finite CorrH, cell 2) but whose error
+% ACF is NaN at every lag has no steady-state estimation error (Omega_ii = 0, e.g. the 'invertible'
+% shortcut of solve_steady_state_riccati: a square, invertible model such as Smets-Wouters without
+% measurement error), so its ACF is 0/0. first_crossing_below would call that "never crosses"
+% (Inf); it is set to NaN here, left out of the medians below, and a state whose half-life is
+% undefined in every draw is printed as '--'. Failed draws (NaN in every cell) keep Inf as before.
+hl_undefined = @(acf3, corr3) squeeze(all(isnan(acf3), 2) & all(isfinite(corr3), 2));
+Error_ACF.half_life(reshape(hl_undefined(Error_ACF.ThreeD, cat(3, oo_.posterior_function_results{:, 2})), size(Error_ACF.half_life)))   = NaN;
+Error_ACF.prior_half_life(reshape(hl_undefined(Error_ACF.prior_ThreeD, cat(3, oo_.prior_function_results{:, 2})), size(Error_ACF.prior_half_life))) = NaN;
 
 state_estimates.prior_KF_Std_TV = cat(3, oo_.prior_function_results{:, 13});
 
@@ -785,7 +794,8 @@ end   % ~DO_TABLES_ONLY (filtered-series and BR panels)
 
 for pp = 1:length(PlotVar.Names)          % (GENERALISED 2026-09-17: was the 'rrstar' and 'gap' name loops)
     PlotVar.Idx{pp} = strcmp(M_.states_of_interest, PlotVar.Engine{pp});
-    SummaryTableMoments(7,pp) = median(Error_ACF.half_life(PlotVar.Idx{pp},:));
+    hl_pp = Error_ACF.half_life(PlotVar.Idx{pp},:);
+    SummaryTableMoments(7,pp) = median(hl_pp(~isnan(hl_pp)));   % undefined draws left out; all undefined -> NaN -> '--' (2026-10-16)
 end
 
 %% Plot histogram of half-life
@@ -801,9 +811,10 @@ for pp=1:length(PlotVar.Names)
     prior_hist_hndl=histogram(min(Error_ACF.prior_half_life(PlotVar.Idx{pp},:), 50), 'Normalization', 'probability');
 
     old_ylim=ylim;
-    plot(min(median(Error_ACF.half_life(PlotVar.Idx{pp},:)), 50)*[1,1],old_ylim,'--k', 'LineWidth', 2)   % Inf median shown at the cap
+    hl_pp = Error_ACF.half_life(PlotVar.Idx{pp},:);  hl_pp = hl_pp(~isnan(hl_pp));   % undefined draws left out (2026-10-16)
+    plot(min(median(hl_pp), 50)*[1,1],old_ylim,'--k', 'LineWidth', 2)   % Inf median shown at the cap; no line if undefined
     axis([0 50 old_ylim]);
-    disp([PlotVar.Names{pp} ' Half-life: ' num2str(median(Error_ACF.half_life(PlotVar.Idx{pp},:)))  ])
+    disp([PlotVar.Names{pp} ' Half-life: ' num2str(median(hl_pp))  ])
 
     print('-dpng', [HLW_directory '/Graphs_level/' cfg.fig_prefix 'HalfLife_' PlotVar.Names{pp} '_prior.png']);
     if pp==1

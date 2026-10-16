@@ -225,9 +225,8 @@ redistributed here; `get_sw_data.m` downloads them from the original source.
     solution: the time-varying filter reaches it only at rate $1/t$, and on the actual sample
     the filtered estimates still carry error.
   - Quantities that are 0/0 at $\Omega = 0$ are undefined: the error autocorrelation, the FEV
-    shares and the implied-reliability identity check (Prop. 5.1), which prints NaN.
-  - The half-life row of the tables shows $\infty$ for these states. It should be read as
-    "undefined (no estimation error)", not as "the errors never decay".
+    shares, the half-life (shown as "--" in the tables) and the implied-reliability identity
+    check (Prop. 5.1), which prints NaN.
 - **SW states are stationary.** $\nu$ is not defined ("--" in the tables). $R^2_h$ rises with
   $h$ partly because its denominator, the conditional variance of the future state, rises
   towards the unconditional variance. The "s.d. of state estimate / innovation s.d." rows
