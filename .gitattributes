@@ -1,0 +1,11 @@
+# Binary files - no line ending conversion
+*.eps binary
+*.pdf binary
+*.png binary
+
+# Text files - force LF endings
+*.tex text eol=lf
+*.R   text eol=lf
+*.py  text eol=lf
+*.m   text eol=lf
+*.csv text eol=lf
