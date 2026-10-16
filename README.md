@@ -94,10 +94,12 @@ Dynare + draw stages / `model_assessment`, plotting adds a few minutes):
 | UC3, quick check | `UC3_MH_REPLIC=2000 UC3_NDRAWS=200 UC3_MA_D=20` | 2 min / 0.2 min |
 | UC3, full | defaults | not re-run for this repository (hours) |
 | SW with measurement error | defaults | 2 min / 0.5 min |
-| SW baseline | defaults | 24 min / 11 min |
+| SW baseline | defaults, one core (`-singleCompThread`, no parallel pool) | 15 min / 3 min |
 
-The SW baseline is slow because its steady-state Riccati equation has no stabilising solution and
-every draw runs the capped fallback iteration (about 20 s per engine call; see Limitations).
+Most of the SW baseline time is in the prior draws. A posterior draw takes about 0.1 s because
+the steady-state Riccati equation is solved in closed form ($\Omega = 0$; see Limitations).
+Prior draws whose transmission zeros lie outside the unit circle fall back to the general
+solvers.
 
 Each workflow has the same three stages:
 
@@ -213,12 +215,19 @@ redistributed here; `get_sw_data.m` downloads them from the original source.
   draws illustrate the workflow; they are not a converged posterior and no convergence
   assessment is claimed. Increase `SW_MH_REPLIC` and `SW_NDRAWS` for substantive work.
 - **SW baseline is a degenerate benchmark.** Without measurement error the SW model has seven
-  shocks for seven noise-free observables: the states are recovered almost exactly ($R^2 \approx 1$,
-  $\Omega_{ii}\approx 0$), and the four differenced observables leave the steady-state Riccati
-  equation without a stabilising solution, so the toolbox falls back to a slow iteration and
-  flags non-convergence (results cell 19). Half-lives and correlations involving them are then
-  numerical artefacts, and the implied-reliability identity check (Prop. 5.1) printed by
-  `HLW_plots` fails (gap about 1), as it requires a converged steady-state filter.
+  shocks for seven noise-free observables, so $D$ is square and invertible and the shocks can
+  be read off the data. The steady-state filter recovers the states exactly: $\Omega = 0$ and
+  $R^2_h = 1$.
+  - The toolbox detects this case directly (`solve_steady_state_riccati`, method
+    `invertible_critical`; see "Square, invertible systems" in
+    `Code/ReliabilityToolbox/README.md`). The four differenced observables put four
+    eigenvalues of $A - BD^{-1}C$ on the unit circle, so this limit is not a stabilising
+    solution: the time-varying filter reaches it only at rate $1/t$, and on the actual sample
+    the filtered estimates still carry error.
+  - Quantities that are 0/0 at $\Omega = 0$ are undefined: the error autocorrelation, the FEV
+    shares and the implied-reliability identity check (Prop. 5.1), which prints NaN.
+  - The half-life row of the tables shows $\infty$ for these states. It should be read as
+    "undefined (no estimation error)", not as "the errors never decay".
 - **SW states are stationary.** $\nu$ is not defined ("--" in the tables). $R^2_h$ rises with
   $h$ partly because its denominator, the conditional variance of the future state, rises
   towards the unconditional variance. The "s.d. of state estimate / innovation s.d." rows

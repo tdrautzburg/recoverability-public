@@ -25,6 +25,26 @@ function [Omega, K, V, Omega_tp1_t, ric_flag] = solve_steady_state_riccati(A, B,
 %   Toolbox, which the production machine does not have, so:
 %
 %   METHODS, tried in this order (opts.method forces one):
+%     'invertible'  (ADDED 2026-10-16) square, invertible D (as many shocks as
+%                observables, no noise-free direction missing): at Omega = 0, (*)
+%                gives B B' - B D' (D D')^{-1} D B' = 0, so Omega = 0 IS a fixed
+%                point, with K = B D^{-1} and closed loop A - K C = F = A - B D^{-1} C
+%                (the eigenvalues of F are the transmission zeros). Hence
+%                  rho(F) < 1   Omega = 0 is the stabilising solution ('invertible';
+%                               the state is recovered exactly in the limit);
+%                  rho(F) = 1   Omega = 0 is the limit of the Riccati recursion (the
+%                               maximal solution) but not stabilising: the filter
+%                               approaches it only at rate ~1/t and no solver below
+%                               can return it - QZ finds no stable deflating
+%                               subspace and the iteration hits its cap after ~20 s
+%                               with residual ~0.5 (Smets-Wouters 2007 without
+%                               measurement error: four eigenvalues of F at 1 from
+%                               the differenced observables) ('invertible_critical');
+%                  rho(F) > 1   Omega = 0 is a fixed point but not the limit; the
+%                               methods below find the stabilising solution.
+%                Accepted when rho(F) <= 1 + opts.tol_unit and the absolute residual
+%                ||f(0)|| / ||B B'|| is below opts.tol_res_raw. ric_flag.converged is
+%                true (the limit is exact); rho_cl = rho(F) flags the critical case.
 %     'dynare'   Dynare's kalman_steady_state MEX (SLICOT SB02OD, generalised
 %                Schur), which ships with every Dynare build and solves the
 %                uncorrelated-noise DARE  P = T P T' + Q - T P Z'(Z P Z' + H)^{-1} Z P T'.
@@ -62,18 +82,20 @@ function [Omega, K, V, Omega_tp1_t, ric_flag] = solve_steady_state_riccati(A, B,
 %                  solution, i.e. an estimate of the relative ERROR (was: last
 %                  relative step of the iteration, a smaller number)
 %     .rho_cl      rho(A - K C)
-%     .method      'dynare' | 'qz' | 'iterate'
+%     .method      'invertible' | 'invertible_critical' | 'dynare' | 'qz' | 'iterate'
 %     .residuals   raw relative residual of every method that was tried
+%                  (for 'invertible': ||f(0)|| / ||B B'||)
 %
 %   opts: .method ('auto'), .Omega0 (start of the iteration, [] = B*B'),
 %         .tol_res (1e-8), .tol_res_raw (1e-10), .MaxIter (1e5),
-%         .tol_riccati (1e-10), .verbose (false)
+%         .tol_riccati (1e-10), .tol_unit (1e-6, how close to 1 counts as the
+%         unit circle in the 'invertible' check), .verbose (false)
 %
 %   See also: kalman_filter_steady_and_diffuse, steady_state_kalman_filter,
 %             theoretical_R2_wedge.
 
 if nargin < 5, opts = struct(); end
-def = struct('method', 'auto', 'Omega0', [], 'tol_res', 1e-8, 'tol_res_raw', 1e-10, 'MaxIter', 1e5, 'tol_riccati', 1e-10, 'verbose', false);
+def = struct('method', 'auto', 'Omega0', [], 'tol_res', 1e-8, 'tol_res_raw', 1e-10, 'MaxIter', 1e5, 'tol_riccati', 1e-10, 'tol_unit', 1e-6, 'verbose', false);
 fn = fieldnames(def);
 for i = 1:numel(fn)
     if ~isfield(opts, fn{i}), opts.(fn{i}) = def.(fn{i}); end
@@ -93,6 +115,30 @@ end
 
 ric_flag = struct('converged', false, 'iterations', 0, 'rel_step', NaN, 'rho_cl', NaN, 'method', '', 'residuals', struct());
 Omega = []; K = []; V = [];
+
+% 'invertible' shortcut (ADDED 2026-10-16, see header): exact Omega = 0 when D is square and
+% invertible and rho(A - B D^{-1} C) <= 1. Its own acceptance test: the residual check below
+% divides by ||Omega|| and by 1 - rho^2, both zero here.
+if any(strcmp(opts.method, {'auto', 'invertible'})) && size(D, 1) == size(D, 2) && rcond(D) > 1e-10
+    F_inv  = A - (B / D) * C;
+    rho_F  = max(abs(eig(F_inv)));
+    f0     = Q - N * (R \ N');                         % f(0) of (*)
+    res0   = norm(f0, 'fro') / max(norm(Q, 'fro'), realmin);
+    ric_flag.residuals.invertible = res0;
+    if opts.verbose, fprintf('solve_steady_state_riccati: invertible check rho(F) = %.8f, residual at Omega = 0 %.2e\n', rho_F, res0); end
+    if rho_F <= 1 + opts.tol_unit && res0 <= opts.tol_res_raw
+        Omega = zeros(n);
+        if rho_F < 1 - opts.tol_unit, ric_flag.method = 'invertible'; else, ric_flag.method = 'invertible_critical'; end
+        ric_flag.converged = true;
+        ric_flag.rel_step  = res0;
+        ric_flag.rho_cl    = rho_F;
+        V = R;
+        K = N / R;                                     % = B D^{-1}
+        Omega_tp1_t = Q;
+        return
+    end
+end
+if strcmp(opts.method, 'invertible'), order = {'iterate'}; end   % shortcut not applicable: keep the fallback
 last_iter = struct('Omega', [], 'iterations', 0, 'rel_step', NaN);
 % (the local function dynare_mex_usable, at the end of this file, remembers whether the MEX loads)
 best      = struct('Omega', [], 'res', Inf, 'rho', NaN, 'method', '');

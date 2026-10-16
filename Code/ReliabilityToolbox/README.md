@@ -306,6 +306,57 @@ Riccati loops plus seven capped Lyapunov loops (minutes). On 30 random stable
 systems the methods agree to 4e-13; when `D D'` is singular the `'dynare'`
 route is skipped and `'qz'` solves.
 
+### Square, invertible systems: `'invertible'` shortcut (2026-10-16)
+
+**Problem.** Smets–Wouters 2007 *without* measurement error (7 shocks, 7
+noise-free observables, four of them first differences: `dy dc dinve dw`) has
+transfer-function zeros at z = 1, so the DARE has no stabilising solution
+(`rho(A-KC)` = 0.99999 in every draw). `'dynare'` and `'qz'` cannot return one,
+and the `'iterate'` fallback approaches the limit only at rate ~1/t: it hit its
+1e5 cap after ~20 s per engine pass with residual ≈ 0.5 and `converged = 0`.
+Downstream, 0/500 posterior draws converged, half-lives were artefacts and the
+Prop. 5.1 identity check failed (gap ≈ 1.1).
+
+**Fix: guess and verify Omega = 0.** With D square and invertible, (*) at
+Omega = 0 gives `B B' - B D' (D D')^{-1} D B' = 0`, so Omega = 0 is always a
+fixed point. The gain is K = B D^{-1} and the closed loop is
+`F = A - B D^{-1} C`, whose eigenvalues are the transmission zeros:
+- rho(F) < 1: the stabilising solution (`ric_flag.method = 'invertible'`);
+- rho(F) = 1: the limit of the Riccati recursion (maximal solution), approached
+  at ~1/t (`'invertible_critical'`; SW: exactly four eigenvalues of F at 1);
+- rho(F) > 1: not the limit; the shortcut is skipped and the other methods run.
+
+`solve_steady_state_riccati` tries this first when `size(D,1) == size(D,2)` and
+`rcond(D) > 1e-10`, and accepts it when `rho(F) <= 1 + opts.tol_unit` (1e-6) and
+`||f(0)|| / ||B B'||` is below `tol_res_raw` (1e-10). It needs its own acceptance
+test because the general one divides by ||Omega|| and 1 − rho². Every call site
+passes its own ABCD for (*), so the shortcut applies wherever D is square.
+
+A side finding: before this change, exactly invertible systems with rho(F) < 1
+were also flagged as not converged. QZ returns Omega ≈ 0, but the relative
+residual test rejects it.
+
+**Effect on the SW baseline (posterior mean, one core).**
+- Engine pass: 8.2 s → 0.44 s.
+- Riccati flag: `converged = 1`, `rho_cl` = 1.
+- `KF_Omega` = 0, `CorrH` = `R2_h` = 1 exactly.
+
+Outputs that are 0/0 at Omega = 0 are NaN or `[]`, the engine's convention for
+undefined values: `Error_ACF`, the FEV shares, `max_HL`/`weighted_HL`/`all_HL`,
+`shock_contributions`, `nu`.
+
+**Interpretation.** In the critical case the time-varying filter on the actual
+sample (`TV_*`) still has a nonzero error at T; R² = 1 is the steady-state
+limit.
+
+**Test.** `test_invertible_riccati.m` covers four cases:
+1. random systems with rho(F) < 1 (9–11 of 30 draws qualify), comparing the
+   shortcut with QZ;
+2. an MA(1) with its zero at 2, where the shortcut must not fire;
+3. an MA(1) with a unit root (`'invertible_critical'`, and the iteration still
+   at 1/(k+1));
+4. a non-square D.
+
 ## Implied reliability from the proxy regression (`fr_implied_R2.m`, 2026-09-17)
 
 Proposition 5.1 of the paper ("Feasible smoother regression: bound and
