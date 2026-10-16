@@ -25,7 +25,7 @@ Two applications:
 
 | Application | Folder | Model |
 |---|---|---|
-| UC3 | `Code/UC3` | Unobserved-components model of output, inflation and unemployment (random-walk trends, common AR(2) gap), US 1960Q1–2019Q4 |
+| UC3 (I(2) potential output) | `Code/UC3` | Unobserved-components model of output, inflation and unemployment: random-walk trends for unemployment ($u^*$) and inflation ($\pi^*$), potential output $y^*$ with a random-walk growth state $g^*$ (I(2) level), common AR(2) gap; US 1960Q1–2019Q4 |
 | Smets–Wouters, baseline | `Code/SmetsWouters` | Smets and Wouters (2007) DSGE model, 7 observables, no measurement error, US 1947Q3–2004Q4 |
 | Smets–Wouters, calibrated measurement error | `Code/SmetsWouters` | Same model with fixed measurement error on output, consumption, investment and wage growth and hours |
 
@@ -73,8 +73,9 @@ All commands are run from the repository root. Each workflow runs in one MATLAB 
 the workflows in separate sessions (the plotting stage keeps figures and global state).
 
 ```bash
-# 1. UC3 (full run: 2 x 50,000 MH draws, 10,000 + 10,000 reliability draws, 300 datasets)
-matlab -sd Code/UC3 -batch "main_run_uc3_levels"
+# 1. UC3 with I(2) potential output (full run: 2 x 50,000 MH draws,
+#    10,000 + 10,000 reliability draws, 300 datasets)
+matlab -sd Code/UC3 -batch "main_run_uc3_levels_i2"
 
 # 2. Smets-Wouters baseline (short illustrative chain)
 matlab -sd Code/SmetsWouters -batch "main_run_sw_baseline"
@@ -91,8 +92,7 @@ Dynare + draw stages / `model_assessment`, plotting adds a few minutes):
 
 | Workflow | Settings | Run time |
 |---|---|---|
-| UC3, quick check | `UC3_MH_REPLIC=2000 UC3_NDRAWS=200 UC3_MA_D=20` | 2 min / 0.2 min |
-| UC3, full | defaults | not re-run for this repository (hours) |
+| UC3 (I(2)) | fixed settings (see Run length) | not run for this repository (expect hours) |
 | SW with measurement error | defaults | 2 min / 0.5 min |
 | SW baseline | defaults, one core (`-singleCompThread`, no parallel pool) | 15 min / 3 min |
 
@@ -112,18 +112,26 @@ Each workflow has the same three stages:
 
 ### Run length
 
-Set environment variables before starting MATLAB (unset = default):
+**UC3.** The run length is fixed in the files; there is no environment switch. To shorten the
+run, edit:
 
-| Variable | Meaning | UC3 default | SW default |
-|---|---|---|---|
-| `UC3_MH_REPLIC` / `SW_MH_REPLIC` | MH draws per chain (2 chains) | 50000 | 5000 |
-| `UC3_NDRAWS` / `SW_NDRAWS` | prior and posterior reliability draws (each) | 10000 | 500 |
-| `UC3_MA_D` / `SW_MA_D` | artificial datasets in `model_assessment` | 300 | 50 |
+| Setting | Where | Value |
+|---|---|---|
+| MH draws per chain (2 chains) | `uc3_levels_i2.mod`, second `estimation` command, `mh_replic` | 50000 |
+| prior and posterior reliability draws (each) | `uc3_levels_i2.mod`, the two `run_reliability_draws(...)` calls | 10000 |
+| artificial datasets in `model_assessment` | `main_run_uc3_levels_i2.m`, `model_assessment(300, ...)` | 300 |
 
-Example (a quick UC3 check): `UC3_MH_REPLIC=2000 UC3_NDRAWS=200 UC3_MA_D=20 matlab -sd Code/UC3 -batch "main_run_uc3_levels"`.
-The drivers pass the first two to Dynare as macros (`-DMH_REPLIC=... -DN_DRAWS=...`); the
-defaults are also set inside the `.mod` files, so `dynare uc3_levels.mod` alone reproduces the
-full UC3 settings.
+**Smets–Wouters.** Set environment variables before starting MATLAB (unset = default):
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `SW_MH_REPLIC` | MH draws per chain (2 chains) | 5000 |
+| `SW_NDRAWS` | prior and posterior reliability draws (each) | 500 |
+| `SW_MA_D` | artificial datasets in `model_assessment` | 50 |
+
+Example: `SW_MH_REPLIC=20000 SW_NDRAWS=2000 matlab -sd Code/SmetsWouters -batch "main_run_sw_me"`.
+The SW driver passes the first two to Dynare as macros (`-DMH_REPLIC=... -DN_DRAWS=...`); the
+defaults are also set inside `Smets_Wouters_2007_45.mod`.
 
 ### Smets–Wouters settings
 
@@ -160,12 +168,13 @@ selected by the macro `SW_ME` (set by the drivers; the file is never edited):
 | | UC3 | SW baseline | SW with measurement error |
 |---|---|---|---|
 | Run folder | `Code/UC3/` | `Code/SmetsWouters/SW_baseline/` | `Code/SmetsWouters/SW_ME/` |
-| Figures | `Graphs_level/` (`LW_KF_*.png`, `MA_*.png`) | `Graphs_level/` (`SW_*.png`, `MA_*.png`) | same |
-| Tables (LaTeX) | `Tables_level/` | `Tables_level/` | same |
-| Results | `UC3_results.mat` (+ `_prior`, `_posterior`) | `SW_results.mat` (+ `_prior`, `_posterior`) | same |
-| Dynare workspace | `tmp.mat` | `tmp.mat` | same |
-| Model assessment | `model_assessment_lecam.mat` | `model_assessment_lecam.mat` | same |
-| Dynare output, MH chains, log | `uc3_levels/`, `uc3_levels.log` | `Smets_Wouters_2007_45/`, `Smets_Wouters_2007_45.log` | same |
+| Figures | `i2/Graphs_level/` (`LW_KF_*.png`, `MA_*.png`) | `Graphs_level/` (`SW_*.png`, `MA_*.png`) | same |
+| Tables (LaTeX) | `i2/Tables_level/` | `Tables_level/` | same |
+| Results | `UC3_i2_results.mat` (+ `_prior`, `_posterior`) | `SW_results.mat` (+ `_prior`, `_posterior`) | same |
+| Dynare workspace | `tmp_i2.mat` | `tmp.mat` | same |
+| Model assessment | `model_assessment_lecam_i2.mat` | `model_assessment_lecam.mat` | same |
+| Dynare output, MH chains, log | `uc3_levels_i2/`, `uc3_levels_i2.log` | `Smets_Wouters_2007_45/`, `Smets_Wouters_2007_45.log` | same |
+| Dynare-vs-toolbox filter comparison | `Dynare_Comparison_uc3_levels_i2.png` | — | — |
 
 The SW run folder is created by the driver and holds a copy of the `.mod` and the data; set
 `SW_RUN_DIR` to use another folder name. Main tables: `table_summary.tex` (state-estimate s.d.,
@@ -175,13 +184,13 @@ $R^2_4$, $R^2_{20}$, $\nu$, half-life), `table_corrh_*.tex`, `table_halflife_*.t
 `*_R2H<h>_*` (histograms), `*_HalfLife_*`, `*_<state>.png` (filtered state with 95% band),
 `MA_*` (model assessment). All outputs are git-ignored.
 
-## Using another model instead of `uc3_levels.mod`
+## Using another model instead of `uc3_levels_i2.mod`
 
 The pipeline is model-agnostic; the model-specific choices sit in the `.mod` file and in the
 driver. To run another linear model:
 
 1. **`.mod` file** — after `estimation`/`calib_smoother` and `stoch_simul`, copy the block of
-   `uc3_levels.mod` that starts at `save tmp.mat`: it sets `M_.observable_names`, `M_.data`,
+   `uc3_levels_i2.mod` that starts at `save tmp_i2.mat`: it sets `M_.observable_names`, `M_.data`,
    `M_.CellList_States = {name, smoother lags, change horizons [, definition]}`,
    `M_.states_of_interest`, `M_.var_list_`, `M_.X_InitialDistribution`, the `oo_.bayestopt_*`
    fields and `oo_.dr.qz_crit`, then calls `save_results_split`, `run_reliability_draws('prior', ...)`
@@ -192,13 +201,14 @@ driver. To run another linear model:
      measurement errors as shocks (as in the SW `.mod`);
    - a state of interest that is not a model variable can be defined as a linear combination in
      column 4, e.g. `{'ygap', [0 1 4 20], [], 'y - yf'}`.
-2. **Driver** — copy `Code/UC3/main_run_uc3_levels.m` (or `Code/SmetsWouters/run_sw_variant.m`
-   for a run in its own folder) and change: the `.mod` name in the `dynare` call, `CLS_uc3`
-   (same list as `M_.CellList_States`), `HLW_RESULTS_FILE` (the name given to
-   `save_results_split`), and `HLW_PLOT_CONFIG`: `PlotVar_Names` (states to plot, engine labels
+2. **Driver** — copy `Code/UC3/main_run_uc3_levels_i2.m` (or `Code/SmetsWouters/run_sw_variant.m`
+   for a run in its own folder) and change: the `.mod` name in the `dynare` call, `CLS_i2`
+   (same list as `M_.CellList_States`), the `workspace` and `save_file` names passed to
+   `model_assessment`, `HLW_RESULTS_FILE` (the name given to `save_results_split`),
+   `HLW_OUT_DIR`, and `HLW_PLOT_CONFIG`: `PlotVar_Names` (states to plot, engine labels
    such as `l20ustar`), `time_start` (first quarter of the data, e.g. `1960` or `1947.5` for
    Q3), `common_scale_base`, `scatter_pairs`, `rmse_vars`, `tracking_vars`, `target_params`
-   (parameter names of the new model) and `rstar_overlay = false`.
+   (parameter names of the new model), `param_tex_names`, `ma_file` and `rstar_overlay = false`.
 3. Run each model (or each variant of one `.mod`) in its own folder: Dynare writes a
    `+<modname>` package and an output folder next to the `.mod`.
 
@@ -211,6 +221,14 @@ redistributed here; `get_sw_data.m` downloads them from the original source.
 
 ## Limitations
 
+- **UC3 (I(2)) not run here.** `main_run_uc3_levels_i2.m` and `uc3_levels_i2.mod` are the
+  research code as is; this repository's own checks were made on the UC3 levels model without
+  $g^*$ and on the SW workflows. Two differences from the SW driver:
+  - Dynare is located by a candidate list in the driver, then `setup_dynare_path`.
+  - The toolbox is added with `genpath`, which also puts `Code/ReliabilityToolbox/octave_compat/`
+    (Octave stand-ins for `contains` and `histogram`) on the MATLAB path. MATLAB then warns that
+    `contains` shadows a built-in. The stand-in `histogram` fails if a plotted statistic is
+    identical in every draw.
 - **Short SW chains.** The default SW chains (2 × 5,000 draws, 20% burn-in) and 500 reliability
   draws illustrate the workflow; they are not a converged posterior and no convergence
   assessment is claimed. Increase `SW_MH_REPLIC` and `SW_NDRAWS` for substantive work.
@@ -235,6 +253,7 @@ redistributed here; `get_sw_data.m` downloads them from the original source.
 - **SW model assessment.** `model_assessment` re-estimates on artificial data with the toolbox's
   Kalman filter, whose likelihood is not exactly Dynare's under the replication settings
   (`presample=4`, `lik_init=2`): the mode condition it prints is 3.2 (measurement error) and 1.6
-  (baseline) posterior s.d. rather than 0 (UC3: 0.000). The Newton steps therefore start off the
+  (baseline) posterior s.d. rather than 0 (0.000 in a check on the UC3 levels model without
+  $g^*$; not checked for the UC3 model in this repository). The Newton steps therefore start off the
   toolbox's mode. Matching the initialisation (`lik_init=1`, `presample=0`) did not remove the
   gap and made the mode search fail.

@@ -1,6 +1,6 @@
 # Dynare: generated packages and output folders
 **/\+*/
-Code/UC3/uc3_levels/
+Code/UC3/uc3_levels_i2/
 Code/SmetsWouters/Smets_Wouters_2007_45/
 **/metropolis/
 
@@ -11,8 +11,7 @@ Code/SmetsWouters/Smets_Wouters_2007_45/
 **/octave-workspace
 
 # Generated figures and tables
-Code/UC3/Graphs_level/
-Code/UC3/Tables_level/
+Code/UC3/i2/
 Code/UC3/*.png
 Code/UC3/*.eps
 
