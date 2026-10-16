@@ -1,4 +1,8 @@
-# recoverability-public
+# How to catch a star? Reliability of filtering estimates in linear state space systems.
+### Disclaimer
+*The views expressed herein are those of the authors and not necessarily those of the Federal Reserve Bank of Philadelphia, the Federal Reserve System, or its Board of Governors*
+
+## Replication Code
 
 Replication code for the reliability ("recoverability") of latent-state estimates from linear
 state-space models. A model is estimated with [Dynare](https://www.dynare.org); a Kalman-filter
@@ -16,7 +20,7 @@ how well the filter and fixed-lag smoothers recover the latent states:
 The code accompanies
 
 > Amisano, Gianni, Thorsten Drautzburg, and Andrea Stella (2026). "How to catch a star?
-> Reliability of filtering estimates in linear state space systems." RTE Conference,
+> Reliability of filtering estimates in linear state space systems." 2026 Real Time Economics Conference,
 > Philadelphia, PA.
 
 Please cite this paper when using the code.
@@ -28,6 +32,9 @@ Two applications:
 | UC3 (I(2) potential output) | `Code/UC3` | Unobserved-components model of output, inflation and unemployment: random-walk trends for unemployment ($u^*$) and inflation ($\pi^*$), potential output $y^*$ with a random-walk growth state $g^*$ (I(2) level), common AR(2) gap; US 1960Q1–2019Q4 |
 | Smets–Wouters, baseline | `Code/SmetsWouters` | Smets and Wouters (2007) DSGE model, 7 observables, no measurement error, US 1947Q3–2004Q4 |
 | Smets–Wouters, calibrated measurement error | `Code/SmetsWouters` | Same model with fixed measurement error on output, consumption, investment and wage growth and hours |
+
+
+
 
 ## Software requirements
 
