@@ -9,7 +9,10 @@
 %       matlab -singleCompThread -batch "profile_posterior_draw"
 %   Prints: versions and threads, whether the 2026-10-20 solver fix is on the path, the time of
 %   five posterior draws with the Riccati method each used, and the 25 most expensive functions
-%   of one draw (MATLAB profiler, self time). Writes nothing.
+%   of one draw (MATLAB profiler, self time). Then (ADDED 2026-10-20, second round) memory use
+%   and the time of 5 posterior draws through run_reliability_draws, first with the small oo_ of
+%   UC3_i2_results.mat and then with the FULL oo_ including the 10000 prior results, as in the
+%   regular run's posterior stage (loading them needs several GB of memory). Writes nothing.
 
 uc3_dir = pwd;
 addpath(fullfile(uc3_dir, '..', 'ReliabilityToolbox'));      % not genpath (octave_compat stays off)
@@ -61,4 +64,38 @@ end
 fprintf('%-60s %10s %10s %8s\n', 'function', 'self [s]', 'total [s]', 'calls');
 for j = ord(1:min(25, numel(ord)))
     fprintf('%-60s %10.3f %10.3f %8d\n', FT(j).FunctionName(1:min(end, 60)), self_t(j), FT(j).TotalTime, FT(j).NumCalls);
+end
+
+% ---- second round: is the regular posterior stage slow because of the full oo_ / memory? ----
+fprintf('\n==== 4. memory before loading the prior results ====\n');
+print_memory();
+
+fprintf('\n==== 5. run_reliability_draws, 5 posterior draws ====\n');
+t0 = tic;
+run_reliability_draws('posterior', 5, W.M_, W.options_, W.oo_, W.estim_params_, W.bayestopt_, W.dataset_, W.dataset_info);
+t_small = toc(t0);
+fprintf('small oo_ (as above):          %.1f s, %.2f s per draw\n', t_small, t_small / 5);
+
+t0 = tic;
+S = load_results_split(fullfile(uc3_dir, 'UC3_i2_results.mat'));   % reattaches the prior (and any posterior) results
+oo_full = S.oo_;  clear S
+b = whos('oo_full');
+fprintf('loaded the full oo_ in %.1f s: %.2f GB, %d prior result rows\n', toc(t0), b.bytes / 2^30, size(oo_full.prior_function_results, 1));
+print_memory();
+
+t0 = tic;
+run_reliability_draws('posterior', 5, W.M_, W.options_, oo_full, W.estim_params_, W.bayestopt_, W.dataset_, W.dataset_info);
+t_full = toc(t0);
+fprintf('full oo_ (as in the regular run): %.1f s, %.2f s per draw\n', t_full, t_full / 5);
+print_memory();
+
+function print_memory()
+% MATLAB's memory use and the free physical memory (memory() exists on Windows only)
+if ispc
+    [u, s] = memory;
+    fprintf('MATLAB uses %.1f GB; physical memory available %.1f of %.1f GB\n', ...
+            u.MemUsedMATLAB / 2^30, s.PhysicalMemory.Available / 2^30, s.PhysicalMemory.Total / 2^30);
+else
+    fprintf('(memory figures are printed on Windows only)\n');
+end
 end
