@@ -357,6 +357,34 @@ limit.
    at 1/(k+1));
 4. a non-square D.
 
+### QZ under MATLAB with complex eigenvalues (FIXED 2026-10-20)
+
+`dare_qz` reads the pencil's eigenvalues with `ordeig`, which handles the 2×2 blocks of
+the real generalised Schur form. It tested `exist('ordeig', 'file')`, which is 0 in
+MATLAB: there `ordeig` is a built-in (`exist` returns 5; in Octave it is an m-file, 2).
+So MATLAB always used the fallback `diag(AA)./diag(BB)`, which gives wrong moduli for
+complex pairs. Whenever the closed loop had complex eigenvalues, the count of
+eigenvalues inside the unit circle was off, `'qz'` was rejected, and the draw fell back
+to the fixed-point iteration.
+
+Example: the UC3-i2 posterior mean counted 115 instead of 114, although the stable and
+unstable sets are cleanly separated (0.988 against 1.012). Every posterior draw iterated
+(median 716 steps), while most prior draws, with real spectra, solved directly. The check
+now accepts a file or a built-in.
+
+**Effect** (short UC3-i2 run, one core):
+- posterior stage 116 s → 94 s;
+- error estimate 3e-9 → 3e-14;
+- every draw solved directly;
+- summary table unchanged.
+
+On a Windows machine without the Parallel Computing Toolbox, posterior draws had taken
+25 s each, about 4× the prior draws there, against 1.3× here. That is consistent with
+the iteration being the expensive step on that machine.
+
+Every model whose closed loop has complex eigenvalues was affected under MATLAB (UC3
+levels too). Octave runs were not. Test: `test_riccati_qz_complex.m`.
+
 ## Implied reliability from the proxy regression (`fr_implied_R2.m`, 2026-09-17)
 
 Proposition 5.1 of the paper ("Feasible smoother regression: bound and

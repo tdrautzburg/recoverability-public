@@ -285,8 +285,14 @@ E = [eye(n),       zeros(n),  zeros(n, p);
 % eigenvalues of the pencil: alpha./beta; "inside" = |alpha| < |beta| (finite, in the unit disc)
 alpha = diag(AA);  beta = diag(BB);
 % ordqz needs a logical selector for the eigenvalues to move to the top; use the
-% 2x2-block-safe eigenvalue extraction via ordeig where available
-if exist('ordeig', 'file')
+% 2x2-block-safe eigenvalue extraction via ordeig where available.
+% FIXED 2026-10-20: was exist('ordeig', 'file'), which is 0 in MATLAB, where ordeig is a
+% BUILT-IN (exist returns 5; in Octave it is an m-file, 2). MATLAB therefore always took the
+% alpha./beta fallback below, which reads complex pairs off the diagonal of the 2x2 blocks
+% of the real Schur form with wrong moduli; with complex closed-loop eigenvalues the count
+% of "inside" eigenvalues was wrong (UC3-i2 posterior mean: 115 instead of 114), 'qz' was
+% rejected and every such draw fell back to the fixed-point iteration (median 716 steps).
+if any(exist('ordeig') == [2 5])                                            %#ok<EXIST>
     ev = ordeig(AA, BB);
 else
     ev = alpha ./ beta;
