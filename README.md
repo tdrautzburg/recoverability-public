@@ -108,6 +108,26 @@ the steady-state Riccati equation is solved in closed form ($\Omega = 0$; see Li
 Prior draws whose transmission zeros lie outside the unit circle fall back to the general
 solvers.
 
+**Without the Parallel Computing Toolbox** the reliability draws (`run_reliability_draws`)
+and the model assessment run serially: each `parfor` loop becomes a plain loop in one MATLAB
+process, and MATLAB prints "Parallel Computing Toolbox is not installed. Falling back to serial."
+The run time then grows with the number of draws:
+
+- **What it costs.** In a check on this repository's machine (UC3 with I(2) potential output,
+  one core), a posterior draw took 0.47 s and a prior draw 0.24 s. The full UC3 settings have
+  10,000 of each, i.e. about 1.3 h for the posterior draws plus 0.7 h for the prior draws.
+  Slower machines take proportionally longer.
+- **Use one computational thread.** Start MATLAB with `-singleCompThread`, e.g.
+  `matlab -singleCompThread -sd Code/UC3 -batch "main_run_uc3_levels_i2"`. In a serial run,
+  MATLAB's multithreaded linear algebra brings little for the small matrices of these models
+  and can slow it down. This was not timed for this repository.
+- **Shorten the run first.** Reduce the number of draws to check the set-up before a full run
+  (see Run length).
+- **Use a current version.** Versions of `solve_steady_state_riccati.m` before 2026-10-20
+  rejected the direct solver under MATLAB whenever the model had complex closed-loop
+  eigenvalues. On one Windows machine without the toolbox this made UC3 posterior draws take
+  about 25 s each.
+
 Each workflow has the same three stages:
 
 1. **Dynare**: estimation (posterior mode, then random-walk Metropolis–Hastings with 2 chains and
