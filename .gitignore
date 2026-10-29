@@ -1,0 +1,31 @@
+# Dynare: generated packages and output folders
+**/\+*/
+Code/UC3/uc3_levels_i2/
+Code/SmetsWouters/Smets_Wouters_2007_45/
+**/metropolis/
+
+# Results, logs and workspaces (written by the workflows)
+**/*.mat
+**/*.log
+**/*.asv
+**/octave-workspace
+
+# Generated figures and tables
+Code/UC3/i2/
+Code/UC3/*.png
+Code/UC3/*.eps
+
+# Smets-Wouters run folders SW_baseline/, SW_ME/ or SW_RUN_DIR (copies of the .mod and data,
+# Dynare output, results, figures, tables); all tracked SW files sit directly in Code/SmetsWouters
+Code/SmetsWouters/*/
+
+# Local scratch space
+scratch/
+
+# Editor, OS and assistant-tool files
+.DS_Store
+.vscode/
+.idea/
+.claude/
+CLAUDE.md
+Agents/
